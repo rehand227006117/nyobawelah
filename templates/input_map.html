@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pilih Lokasi di Peta - Deteksi Kualitas Udara</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        #map { height: 500px; width: 100%; margin-top: 20px; }
+        #search-form { margin: 20px 0; }
+        #air-quality-info { margin-top: 20px; padding: 10px; border: 1px solid #ddd; width: 300px; }
+    </style>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+</head>
+<body>
+    <h1>Pilih Lokasi di Peta</h1>
+
+    <!-- Form pencarian untuk lokasi -->
+    <div id="search-form">
+        <label for="search">Cari Kota atau Lokasi:</label>
+        <input type="text" id="search" placeholder="Contoh: Jakarta">
+        <button onclick="searchLocation()">Cari</button>
+    </div>
+
+    <!-- Peta -->
+    <div id="map"></div>
+
+    <!-- Area untuk menampilkan informasi kualitas udara -->
+    <div id="air-quality-info">
+        <h2>Informasi Kualitas Udara</h2>
+        <p><strong>Koordinat:</strong> <span id="coordinates">-</span></p>
+        <p id="aqi">AQI: -</p>
+        <p id="pm25">PM2.5: -</p>
+        <p id="pm10">PM10: -</p>
+        <p id="temp">Temperatur: -</p>
+        <p id="pressure">Tekanan Udara: -</p>
+        <p id="humidity">Kelembaban: -</p>
+        <p id="wind">Kecepatan Angin: -</p>
+        <p id="advice">Saran: -</p>
+    </div>
+
+    <script>
+        // Inisialisasi peta
+        var map = L.map('map').setView([-6.2088, 106.8456], 13);  // Lokasi default di Jakarta
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+        }).addTo(map);
+
+        // Fungsi untuk memperbarui informasi kualitas udara
+        function updateAirQuality(lat, lon) {
+            fetch(`/air_quality_by_coords?lat=${lat}&lon=${lon}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("coordinates").innerText = `Latitude: ${lat}, Longitude: ${lon}`;
+                    if (data.aqi) {
+                        document.getElementById("aqi").innerHTML = `AQI: ${data.aqi} (${data.category})`;
+                        document.getElementById("aqi").className = data.class_color;
+                        document.getElementById("pm25").innerHTML = `PM2.5: ${data.pm25} µg/m³`;
+                        document.getElementById("pm10").innerHTML = `PM10: ${data.pm10} µg/m³`;
+                        document.getElementById("temp").innerHTML = `Temperatur: ${data.temp}°C`;
+                        document.getElementById("pressure").innerHTML = `Tekanan Udara: ${data.pressure} hPa`;
+                        document.getElementById("humidity").innerHTML = `Kelembaban: ${data.humidity}%`;
+                        document.getElementById("wind").innerHTML = `Kecepatan Angin: ${data.wind} m/s`;
+                        document.getElementById("advice").innerHTML = `Saran: ${data.health_advice}`;
+                    } else {
+                        document.getElementById("aqi").innerHTML = "AQI: Data tidak tersedia";
+                        document.getElementById("pm25").innerHTML = "PM2.5: Data tidak tersedia";
+                        document.getElementById("pm10").innerHTML = "PM10: Data tidak tersedia";
+                        document.getElementById("temp").innerHTML = "Temperatur: Data tidak tersedia";
+                        document.getElementById("pressure").innerHTML = "Tekanan Udara: Data tidak tersedia";
+                        document.getElementById("humidity").innerHTML = "Kelembaban: Data tidak tersedia";
+                        document.getElementById("wind").innerHTML = "Kecepatan Angin: Data tidak tersedia";
+                        document.getElementById("advice").innerHTML = "Saran: Data tidak tersedia";
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Fungsi untuk melakukan pencarian lokasi menggunakan Nominatim API
+        function searchLocation() {
+            var searchQuery = document.getElementById("search").value;
+            var nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}`;
+
+            fetch(nominatimUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        // Ambil hasil pencarian pertama yang paling relevan
+                        var location = data[0];
+                        var lat = location.lat;
+                        var lon = location.lon;
+
+                        // Pindahkan peta ke lokasi hasil pencarian
+                        map.setView([lat, lon], 13);
+
+                        // Perbarui informasi kualitas udara berdasarkan lokasi hasil pencarian
+                        updateAirQuality(lat, lon);
+                    } else {
+                        alert("Lokasi tidak ditemukan. Coba masukkan nama kota atau lokasi lain.");
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Event handler untuk klik pada peta
+        map.on('click', function(e) {
+            var lat = e.latlng.lat;
+            var lon = e.latlng.lng;
+
+            // Pindahkan peta ke lokasi yang diklik dan perbarui informasi kualitas udara
+            map.setView([lat, lon], 13);
+            updateAirQuality(lat, lon);
+        });
+    </script>
+</body>
+</html>
